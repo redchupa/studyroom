@@ -250,15 +250,15 @@ async function deleteCode(code) {
   } finally { loading(false); }
 }
 
-// ── 좌석 강제 삭제 ─────────────────────────────
+// ── 좌석 강제 삭제 (퇴실코드 없이) ───────────────
 async function forceDelete(i) {
   const s = lastSeats.seats[i];
   if (!s) return;
-  if (!confirm(`[${s.name} / ${s.unit}] 강제 퇴실 처리하겠습니까?`)) return;
+  if (!confirm(`[${s.name}] 강제 퇴실 처리하겠습니까?`)) return;
   loading(true, '처리 중...');
   try {
-    const res = await call('deleteEntry', { name: s.name, unit: s.unit, time: s.time });
-    lastSeats.seats = res.seats.seats || res.seats || [];
+    const res = await call('adminDeleteEntry', { name: s.name, time: s.time });
+    lastSeats.seats = (res.seats?.seats) || res.seats || [];
     renderSeats();
     toast(`[${s.name}] 강제 퇴실 완료`, 'success');
   } catch(e) {
@@ -311,7 +311,6 @@ function renderSeats() {
       <div class="seat-num">${i+1}</div>
       <div class="seat-info">
         <div class="seat-name">${esc(s.name)}</div>
-        <div class="seat-detail">${esc(s.unit)}</div>
       </div>
       <div class="seat-time">${s.time||''}</div>
       <button class="btn-force-del" onclick="forceDelete(${i})">강제 퇴실</button>
