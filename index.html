@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제일풍경채더숲 독서실 출입 명부</title>
+<style>
+:root {
+  --blue-dark : #1a2e5a;
+  --blue-mid  : #2c5282;
+  --blue-light: #ebf4ff;
+  --gold      : #c9a227;
+  --red       : #c53030;
+  --red-light : #fff5f5;
+  --green     : #276749;
+  --green-light:#f0fff4;
+  --gray      : #718096;
+  --border    : #e2e8f0;
+  --bg        : #f0f4f8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg);min-height:100vh;padding-bottom:48px}
+
+/* Header */
+.header{background:linear-gradient(135deg,var(--blue-dark),var(--blue-mid));color:#fff;padding:24px 20px 18px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,.2)}
+.header h1{font-size:1.35rem;font-weight:700;margin-bottom:4px}
+.header .sub{font-size:.78rem;opacity:.8;margin-bottom:14px}
+.header-date{display:inline-block;background:rgba(255,255,255,.18);border-radius:20px;padding:5px 18px;font-size:.82rem;font-weight:600}
+
+/* Notice */
+.notice{background:#fffbeb;border-left:4px solid var(--gold);border-radius:0 8px 8px 0;padding:12px 16px;margin:14px 14px 0;font-size:.76rem;color:#744210;line-height:1.65}
+.notice strong{display:block;margin-bottom:3px;font-size:.8rem}
+
+/* Card */
+.card{background:#fff;border-radius:14px;margin:14px;box-shadow:0 2px 10px rgba(0,0,0,.07);overflow:hidden}
+.card-head{background:var(--blue-dark);color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between}
+.card-head h2{font-size:.95rem;font-weight:700}
+.card-body{padding:14px}
+
+/* Count */
+.count-wrap{display:flex;align-items:center;gap:8px}
+.count-text{font-size:.88rem;font-weight:700}
+.count-bar{width:72px;height:7px;background:rgba(255,255,255,.3);border-radius:4px;overflow:hidden}
+.count-fill{height:100%;background:var(--gold);border-radius:4px;transition:width .4s}
+
+/* Seat dots */
+.seat-grid{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:10px 0 4px}
+.seat-dot{width:58px;height:58px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:.6rem;font-weight:700;border:2px solid;transition:all .3s}
+.seat-dot.avail{background:var(--green-light);border-color:#68d391;color:var(--green)}
+.seat-dot.taken{background:var(--red-light);border-color:#fc8181;color:var(--red)}
+.seat-legend{display:flex;gap:14px;justify-content:center;margin-top:9px;font-size:.7rem;color:var(--gray)}
+.ldot{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:3px;vertical-align:middle}
+
+/* Roster */
+.roster-empty{text-align:center;color:var(--gray);font-size:.83rem;padding:22px 0}
+.roster-item{display:flex;align-items:center;padding:11px 12px;border-radius:10px;margin-bottom:7px;background:#f7fafc;border:1px solid var(--border)}
+.roster-item:last-child{margin-bottom:0}
+.rnum{width:26px;height:26px;background:var(--blue-dark);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;flex-shrink:0;margin-right:10px}
+.rinfo{flex:1}
+.rname{font-weight:700;font-size:.88rem;color:#2d3748}
+.rdetail{font-size:.7rem;color:var(--gray);margin-top:2px}
+.rtime{font-size:.68rem;color:var(--gray);margin-right:8px;min-width:36px;text-align:right}
+.btn-del{background:var(--red-light);color:var(--red);border:1.5px solid #fc8181;border-radius:7px;padding:5px 11px;font-size:.73rem;font-weight:700;cursor:pointer;transition:all .2s;font-family:inherit;white-space:nowrap}
+.btn-del:hover{background:var(--red);color:#fff}
+
+/* Form */
+.status-banner{border-radius:9px;padding:12px 14px;text-align:center;font-size:.82rem;font-weight:700;margin-bottom:12px}
+.s-open{background:var(--green-light);color:var(--green);border:1.5px solid #9ae6b4}
+.s-full{background:var(--red-light);color:var(--red);border:1.5px solid #fc8181}
+.form-group{margin-bottom:10px}
+.form-label{display:block;font-size:.78rem;font-weight:700;color:#4a5568;margin-bottom:5px}
+.form-input{width:100%;border:2px solid var(--border);border-radius:9px;padding:10px 13px;font-size:.88rem;font-family:inherit;color:#2d3748;outline:none;transition:border-color .2s}
+.form-input:focus{border-color:var(--blue-mid)}
+.form-input::placeholder{color:#a0aec0}
+.btn-reg{width:100%;background:linear-gradient(135deg,var(--blue-dark),var(--blue-mid));color:#fff;border:none;border-radius:9px;padding:13px;font-size:.95rem;font-weight:700;cursor:pointer;transition:all .2s;font-family:inherit;margin-top:4px;box-shadow:0 4px 10px rgba(44,82,130,.28)}
+.btn-reg:hover{transform:translateY(-1px);box-shadow:0 6px 14px rgba(44,82,130,.33)}
+.btn-reg:disabled{background:#a0aec0;box-shadow:none;cursor:not-allowed;transform:none}
+
+/* Loading */
+.loading{position:fixed;inset:0;background:rgba(255,255,255,.88);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:12px}
+.spinner{width:38px;height:38px;border:4px solid var(--border);border-top-color:var(--blue-mid);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ltext{font-size:.82rem;color:var(--gray);font-weight:600}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#2d3748;color:#fff;padding:11px 22px;border-radius:100px;font-size:.82rem;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.22);transition:transform .3s;z-index:1000;white-space:nowrap;max-width:90vw;text-align:center}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.error{background:var(--red)}
+.toast.success{background:var(--green)}
+
+.footer{text-align:center;color:var(--gray);font-size:.68rem;padding:6px 16px;line-height:1.8}
+</style>
+</head>
+<body>
+
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <div class="ltext" id="ltext">명부를 불러오는 중...</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<div class="header">
+  <h1>📚 제일풍경채더숲 독서실</h1>
+  <div class="sub">1회 입장권 온라인 출입 명부</div>
+  <div class="header-date" id="headerDate">-</div>
+</div>
+
+<div class="notice">
+  <strong>⚠ 이용 전 필수 확인</strong>
+  <b>관리사무소에 입장권(종이)을 제출하고 코드를 받은 분만</b> 등록 가능합니다.<br>
+  하루 최대 <b>5명</b> 제한 · 퇴실 시 반드시 <b>본인 항목 직접 삭제</b> · 자정 자동 초기화
+</div>
+
+<!-- 현황 -->
+<div class="card">
+  <div class="card-head">
+    <h2>🪑 좌석 현황</h2>
+    <div class="count-wrap">
+      <div class="count-text" id="countText">0 / 5명</div>
+      <div class="count-bar"><div class="count-fill" id="countFill" style="width:0%"></div></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="seat-grid" id="seatGrid"></div>
+    <div class="seat-legend">
+      <span><span class="ldot" style="background:#68d391"></span>이용 가능</span>
+      <span><span class="ldot" style="background:#fc8181"></span>이용 중</span>
+    </div>
+  </div>
+</div>
+
+<!-- 명부 -->
+<div class="card">
+  <div class="card-head"><h2>📋 현재 등록 명부</h2></div>
+  <div class="card-body">
+    <div id="rosterList"><div class="roster-empty">등록된 이용자가 없습니다.</div></div>
+  </div>
+</div>
+
+<!-- 등록 폼 -->
+<div class="card">
+  <div class="card-head"><h2>✏️ 명부 등록</h2></div>
+  <div class="card-body">
+    <div id="statusBanner" class="status-banner s-open">✅ 입장 가능 — 관리사무소에서 코드를 받은 후 등록해 주세요</div>
+    <div class="form-group">
+      <label class="form-label" for="iName">이름</label>
+      <input class="form-input" type="text" id="iName" placeholder="예: 홍길동" maxlength="10" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="iUnit">동·호수</label>
+      <input class="form-input" type="text" id="iUnit" placeholder="예: 101-1001" maxlength="12" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="iCode">입장 코드 <span style="color:var(--gray);font-weight:400">(관리사무소 발급)</span></label>
+      <input class="form-input" type="text" id="iCode" placeholder="예: A3F7" maxlength="4"
+             autocomplete="off" style="letter-spacing:4px;font-weight:700;font-size:1.1rem;text-transform:uppercase">
+    </div>
+    <button class="btn-reg" id="btnReg" onclick="register()">등록하기</button>
+  </div>
+</div>
+
+<div class="footer">
+  ※ 무인 운영 시설입니다. 이용 수칙을 반드시 준수해 주세요.<br>
+  문의: 제일풍경채더숲 관리사무소
+</div>
+
+<script>
+const API = '/.netlify/functions/api';
+let currentData = { date:'', seats:[] };
+
+// ── 날짜 표시 ──────────────────────────────────
+function fmtDate(str) {
+  if (!str) return '';
+  const [y,m,d] = str.split('-');
+  const days = ['일','월','화','수','목','금','토'];
+  const dow = days[new Date(str).getDay()];
+  return `${y}년 ${+m}월 ${+d}일 (${dow})`;
+}
+
+// ── 렌더 ───────────────────────────────────────
+function render(data) {
+  currentData = data;
+  const seats = data.seats || [];
+  const count = seats.length;
+  const full  = count >= 5;
+
+  document.getElementById('headerDate').textContent = fmtDate(data.date);
+  document.getElementById('countText').textContent  = `${count} / 5명`;
+  document.getElementById('countFill').style.width  = `${count/5*100}%`;
+
+  // 좌석 도트
+  const grid = document.getElementById('seatGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < 5; i++) {
+    const s = seats[i];
+    const el = document.createElement('div');
+    el.className = 'seat-dot ' + (s ? 'taken' : 'avail');
+    el.innerHTML = s
+      ? `<span style="font-size:1.1rem">🧑‍💻</span><span>${esc(s.name).slice(0,3)}</span>`
+      : `<span style="font-size:1.2rem">💺</span><span>빈자리</span>`;
+    grid.appendChild(el);
+  }
+
+  // 명부
+  const list = document.getElementById('rosterList');
+  list.innerHTML = seats.length === 0
+    ? '<div class="roster-empty">등록된 이용자가 없습니다.</div>'
+    : seats.map((s, i) => `
+      <div class="roster-item">
+        <div class="rnum">${i+1}</div>
+        <div class="rinfo">
+          <div class="rname">${esc(s.name)}</div>
+          <div class="rdetail">${esc(s.unit)}</div>
+        </div>
+        <div class="rtime">${s.time||''}</div>
+        <button class="btn-del" onclick="doDelete(${i})">퇴실 삭제</button>
+      </div>`).join('');
+
+  // 배너·버튼
+  const banner = document.getElementById('statusBanner');
+  const btn    = document.getElementById('btnReg');
+  if (full) {
+    banner.className = 'status-banner s-full';
+    banner.textContent = '🚫 오늘 정원(5명)이 마감되었습니다. 내일 다시 이용해 주세요.';
+    btn.disabled = true;
+  } else {
+    banner.className = 'status-banner s-open';
+    banner.textContent = `✅ 입장 가능 (${5 - count}자리 남음) — 관리사무소에서 코드를 받은 후 등록해 주세요`;
+    btn.disabled = false;
+  }
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── 등록 ───────────────────────────────────────
+async function register() {
+  const name = document.getElementById('iName').value.trim();
+  const unit = document.getElementById('iUnit').value.trim();
+  const code = document.getElementById('iCode').value.trim().toUpperCase();
+  if (!name) { toast('이름을 입력해 주세요.', 'error'); return; }
+  if (!unit) { toast('동·호수를 입력해 주세요.', 'error'); return; }
+  if (!code) { toast('관리사무소에서 받은 코드를 입력해 주세요.', 'error'); return; }
+  if (code.length !== 4) { toast('코드는 4자리입니다.', 'error'); return; }
+
+  loading(true, '등록 중...');
+  try {
+    const res = await call('register', { name, unit, code });
+    document.getElementById('iName').value = '';
+    document.getElementById('iUnit').value = '';
+    document.getElementById('iCode').value = '';
+    render(res.seats);
+    toast('✅ 등록 완료! 퇴실 시 반드시 삭제해 주세요.', 'success');
+  } catch(e) {
+    toast(e.message, 'error');
+  } finally { loading(false); }
+}
+
+// ── 삭제 ───────────────────────────────────────
+async function doDelete(i) {
+  const s = currentData.seats[i];
+  if (!s) return;
+  if (!confirm(`[${s.name} / ${s.unit}]\n퇴실 처리하겠습니까?`)) return;
+  loading(true, '삭제 중...');
+  try {
+    const res = await call('deleteEntry', { name: s.name, unit: s.unit, time: s.time });
+    render(res.seats);
+    toast('👋 퇴실 완료. 이용해 주셔서 감사합니다!', 'success');
+  } catch(e) {
+    toast(e.message, 'error');
+  } finally { loading(false); }
+}
+
+// ── API 호출 ────────────────────────────────────
+async function call(action, body={}) {
+  const res = await fetch(`${API}?action=${action}`, {
+    method : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify(body),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || '서버 오류');
+  return json;
+}
+
+async function loadSeats() {
+  const res = await fetch(`${API}?action=getSeats`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || '로딩 실패');
+  return json;
+}
+
+// ── 로딩/토스트 ────────────────────────────────
+function loading(on, msg='') {
+  document.getElementById('loading').style.display = on ? 'flex' : 'none';
+  if (msg) document.getElementById('ltext').textContent = msg;
+}
+let tt;
+function toast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'toast ' + type;
+  requestAnimationFrame(() => el.classList.add('show'));
+  clearTimeout(tt); tt = setTimeout(() => el.classList.remove('show'), 3400);
+}
+
+// ── 키보드 ─────────────────────────────────────
+document.getElementById('iName').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('iUnit').focus(); });
+document.getElementById('iUnit').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('iCode').focus(); });
+document.getElementById('iCode').addEventListener('keydown', e => { if(e.key==='Enter') register(); });
+
+// ── 자동 갱신 30초 ─────────────────────────────
+setInterval(async () => {
+  try { render(await loadSeats()); } catch(_) {}
+}, 30000);
+
+// ── 초기 로드 ──────────────────────────────────
+(async () => {
+  try {
+    render(await loadSeats());
+    loading(false);
+  } catch(e) {
+    loading(false);
+    toast('데이터 로딩 실패. 새로고침 해주세요.', 'error');
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>독서실 관리자 페이지</title>
+<style>
+:root{
+  --blue-dark:#1a2e5a;--blue-mid:#2c5282;
+  --gold:#c9a227;--red:#c53030;--red-light:#fff5f5;
+  --green:#276749;--green-light:#f0fff4;
+  --gray:#718096;--border:#e2e8f0;--bg:#f0f4f8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg);min-height:100vh;padding-bottom:48px}
+
+/* Login */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-box{background:#fff;border-radius:16px;padding:36px 28px;width:100%;max-width:360px;box-shadow:0 4px 20px rgba(0,0,0,.1);text-align:center}
+.login-box h1{color:var(--blue-dark);font-size:1.2rem;margin-bottom:6px}
+.login-box p{color:var(--gray);font-size:.78rem;margin-bottom:24px}
+.login-input{width:100%;border:2px solid var(--border);border-radius:9px;padding:12px 14px;font-size:1rem;font-family:inherit;outline:none;text-align:center;letter-spacing:3px;margin-bottom:12px;transition:border-color .2s}
+.login-input:focus{border-color:var(--blue-mid)}
+.login-btn{width:100%;background:linear-gradient(135deg,var(--blue-dark),var(--blue-mid));color:#fff;border:none;border-radius:9px;padding:13px;font-size:.95rem;font-weight:700;cursor:pointer;font-family:inherit}
+
+/* Header */
+.header{background:linear-gradient(135deg,var(--blue-dark),var(--blue-mid));color:#fff;padding:20px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 12px rgba(0,0,0,.2)}
+.header h1{font-size:1.1rem;font-weight:700}
+.btn-logout{background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.4);border-radius:8px;padding:6px 14px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:inherit}
+
+/* Card */
+.card{background:#fff;border-radius:14px;margin:14px;box-shadow:0 2px 10px rgba(0,0,0,.07);overflow:hidden}
+.card-head{background:var(--blue-dark);color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between}
+.card-head h2{font-size:.95rem;font-weight:700}
+.card-body{padding:14px}
+
+/* Big code display */
+.code-display{
+  background:linear-gradient(135deg,var(--blue-dark),var(--blue-mid));
+  color:#fff;border-radius:12px;padding:24px;text-align:center;margin-bottom:14px;
+}
+.code-display .code-value{font-size:2.8rem;font-weight:800;letter-spacing:10px;font-family:monospace;color:var(--gold);text-shadow:0 2px 8px rgba(0,0,0,.3)}
+.code-display .code-label{font-size:.75rem;opacity:.8;margin-top:6px}
+.btn-copy{background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.4);border-radius:8px;padding:8px 20px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit;margin-top:10px;transition:all .2s}
+.btn-copy:hover{background:rgba(255,255,255,.25)}
+
+/* Generate button */
+.btn-gen{width:100%;background:linear-gradient(135deg,#276749,#38a169);color:#fff;border:none;border-radius:9px;padding:13px;font-size:.95rem;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 10px rgba(39,103,73,.3);transition:all .2s}
+.btn-gen:hover{transform:translateY(-1px);box-shadow:0 6px 14px rgba(39,103,73,.35)}
+.form-group{margin-bottom:10px}
+.form-label{display:block;font-size:.78rem;font-weight:700;color:#4a5568;margin-bottom:5px}
+.form-input{width:100%;border:2px solid var(--border);border-radius:9px;padding:10px 13px;font-size:.88rem;font-family:inherit;color:#2d3748;outline:none;transition:border-color .2s}
+.form-input:focus{border-color:var(--blue-mid)}
+.form-input::placeholder{color:#a0aec0}
+
+/* Code list */
+.code-empty{text-align:center;color:var(--gray);font-size:.82rem;padding:20px 0}
+.code-item{display:flex;align-items:center;padding:10px 12px;border-radius:9px;margin-bottom:7px;background:#f7fafc;border:1px solid var(--border)}
+.code-item:last-child{margin-bottom:0}
+.code-chip{font-size:1.2rem;font-weight:800;letter-spacing:4px;font-family:monospace;color:var(--blue-dark);margin-right:12px;min-width:60px}
+.code-meta{flex:1;font-size:.72rem;color:var(--gray);line-height:1.5}
+.btn-del-code{background:var(--red-light);color:var(--red);border:1.5px solid #fc8181;border-radius:7px;padding:5px 10px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn-del-code:hover{background:var(--red);color:#fff}
+
+/* Seats section */
+.seat-row{display:flex;align-items:center;padding:10px 12px;border-radius:9px;margin-bottom:7px;background:#f7fafc;border:1px solid var(--border)}
+.seat-row:last-child{margin-bottom:0}
+.seat-num{width:26px;height:26px;background:var(--blue-dark);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;margin-right:10px;flex-shrink:0}
+.seat-info{flex:1}
+.seat-name{font-weight:700;font-size:.88rem;color:#2d3748}
+.seat-detail{font-size:.7rem;color:var(--gray);margin-top:2px}
+.seat-time{font-size:.68rem;color:var(--gray);margin-right:8px}
+.btn-force-del{background:var(--red-light);color:var(--red);border:1.5px solid #fc8181;border-radius:7px;padding:5px 10px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn-force-del:hover{background:var(--red);color:#fff}
+
+.btn-reset{background:var(--red-light);color:var(--red);border:1.5px solid #fc8181;border-radius:8px;padding:7px 16px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-reset:hover{background:var(--red);color:#fff}
+
+/* Loading / Toast */
+.loading{position:fixed;inset:0;background:rgba(255,255,255,.88);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:12px}
+.spinner{width:36px;height:36px;border:4px solid var(--border);border-top-color:var(--blue-mid);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ltext{font-size:.8rem;color:var(--gray);font-weight:600}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#2d3748;color:#fff;padding:11px 22px;border-radius:100px;font-size:.82rem;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.22);transition:transform .3s;z-index:1000;white-space:nowrap;max-width:90vw;text-align:center}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.error{background:var(--red)}
+.toast.success{background:var(--green)}
+
+.hidden{display:none!important}
+.tag-today{background:#ebf4ff;color:var(--blue-mid);border-radius:4px;padding:1px 6px;font-size:.65rem;font-weight:700;margin-left:4px}
+</style>
+</head>
+<body>
+
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <div class="ltext" id="ltext">처리 중...</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- ── 로그인 화면 ── -->
+<div id="loginScreen" class="login-wrap">
+  <div class="login-box">
+    <h1>🔐 관리자 로그인</h1>
+    <p>제일풍경채더숲 독서실 관리자 전용</p>
+    <input class="login-input" type="password" id="pwInput" placeholder="비밀번호" autocomplete="off">
+    <button class="login-btn" onclick="doLogin()">로그인</button>
+  </div>
+</div>
+
+<!-- ── 관리자 메인 ── -->
+<div id="mainScreen" class="hidden">
+
+  <div class="header">
+    <h1>🛠 독서실 관리자</h1>
+    <button class="btn-logout" onclick="logout()">로그아웃</button>
+  </div>
+
+  <!-- 코드 생성 -->
+  <div class="card">
+    <div class="card-head"><h2>🎫 입장 코드 생성</h2></div>
+    <div class="card-body">
+      <div id="newCodeWrap" class="hidden">
+        <div class="code-display">
+          <div class="code-value" id="newCodeVal">----</div>
+          <div class="code-label">입주민에게 이 코드를 전달하세요</div>
+          <button class="btn-copy" onclick="copyCode()">📋 코드 복사</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">메모 <span style="color:var(--gray);font-weight:400">(선택 · 동호수 등)</span></label>
+        <input class="form-input" type="text" id="memoInput" placeholder="예: 101-1001" maxlength="20" autocomplete="off">
+      </div>
+      <button class="btn-gen" onclick="createCode()">✨ 코드 생성하기</button>
+    </div>
+  </div>
+
+  <!-- 유효 코드 목록 -->
+  <div class="card">
+    <div class="card-head">
+      <h2>📋 미사용 코드 목록</h2>
+      <button class="btn-logout" onclick="loadAll()" style="font-size:.72rem;padding:4px 10px">새로고침</button>
+    </div>
+    <div class="card-body">
+      <div id="codeList"><div class="code-empty">코드가 없습니다.</div></div>
+    </div>
+  </div>
+
+  <!-- 현재 좌석 현황 -->
+  <div class="card">
+    <div class="card-head">
+      <h2>🪑 현재 좌석 현황</h2>
+      <button class="btn-reset" onclick="resetSeats()">전체 초기화</button>
+    </div>
+    <div class="card-body">
+      <div id="seatList"><div class="code-empty">등록된 이용자가 없습니다.</div></div>
+    </div>
+  </div>
+
+</div><!-- /mainScreen -->
+
+<script>
+const API = '/.netlify/functions/api';
+let adminPw  = '';
+let lastCodes = [];
+let lastSeats = { date:'', seats:[] };
+
+// ── 로그인 ─────────────────────────────────────
+document.getElementById('pwInput').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+async function doLogin() {
+  const pw = document.getElementById('pwInput').value;
+  if (!pw) { toast('비밀번호를 입력하세요.', 'error'); return; }
+  loading(true, '로그인 중...');
+  try {
+    await call('adminLogin', { password: pw });
+    adminPw = pw;
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('mainScreen').classList.remove('hidden');
+    await loadAll();
+  } catch(e) {
+    toast(e.message, 'error');
+  } finally { loading(false); }
+}
+
+function logout() {
+  adminPw = '';
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('mainScreen').classList.add('hidden');
+  document.getElementById('pwInput').value = '';
+}
+
+// ── 전체 로드 ──────────────────────────────────
+async function loadAll() {
+  loading(true, '데이터 불러오는 중...');
+  try {
+    const [codesRes, seatsRes] = await Promise.all([
+      call('getCodes', {}),
+      fetchSeats(),
+    ]);
+    lastCodes = codesRes.codes || [];
+    lastSeats = seatsRes;
+    renderCodes();
+    renderSeats();
+  } catch(e) {
+    toast(e.message, 'error');
+  } finally { loading(false); }
+}
+
+async function fetchSeats() {
+  const res = await fetch(`${API}?action=getSeats`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || '좌석 로딩 실패');
+  return json;
+}
+
+// ── 코드 생성 ──────────────────────────────────
+async function createCode() {
+  const memo = document.getElementById('memoInput').value.trim();
+  loading(true, '코드 생성 중...');
+  try {
+    const res = await call('createCode', { memo });
+    lastCodes = res.codes.codes || res.codes || [];
+    document.getElementById('newCodeVal').textContent = res.code;
+    document.getElementById('newCodeWrap').classList.remove('hidden');
+    document.getElementById('memoInput').value = '';
+    renderCodes();
+    toast(`코드 [${res.code}] 생성 완료!`, 'success');
+  } catch(e) {
+    toast(e.message, 'error');
+  } finally { loading(false); }
+}
+
+function copyCode() {
+  const code = document.getElementById('newCodeVal').textContent;
+  navigator.clipboard.writeText(code).then(() => toast('코드가 복사되었습니다.', 'success'));
+}
+
+// ── 코드 삭제 ──────────────────────────────────
+async function deleteCode(code) {
+  if (!confirm(`코드 [${code}] 를 삭제하겠습니까?`)) return;
+  loading(true, '삭제 중...');
+  try {
+    const res = await call('deleteCode', { code });
+    lastCodes = res.codes.codes || res.codes || [];
+    renderCodes();
+    toast(`코드 [${code}] 삭제 완료`, 'success');
+  } catch(e) {
+    toast(e.message, 'error');
+  } finally { loading(false); }
+}
+
+// ── 좌석 강제 삭제 ─────────────────────────────
+async function forceDelete(i) {
+  const s = lastSeats.seats[i];
+  if (!s) return;
+  if (!confirm(`[${s.name} / ${s.unit}] 강제 퇴실 처리하겠습니까?`)) return;
+  loading(true, '처리 중...');
+  try {
+    const res = await call('deleteEntry', { name: s.name, unit: s.unit, time: s.time });
+    lastSeats.seats = res.seats.seats || res.seats || [];
+    renderSeats();
+    toast(`[${s.name}] 강제 퇴실 완료`, 'success');
+  } catch(e) {
+    toast(e.message, 'error');
+  } finally { loading(false); }
+}
+
+// ── 좌석 전체 초기화 ───────────────────────────
+async function resetSeats() {
+  if (!confirm('오늘 좌석 명부를 전체 초기화하겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
+  loading(true, '초기화 중...');
+  try {
+    await call('resetSeats', {});
+    lastSeats.seats = [];
+    renderSeats();
+    toast('좌석 명부 초기화 완료', 'success');
+  } catch(e) {
+    toast(e.message, 'error');
+  } finally { loading(false); }
+}
+
+// ── 렌더 ───────────────────────────────────────
+function renderCodes() {
+  const el = document.getElementById('codeList');
+  const codes = Array.isArray(lastCodes) ? lastCodes : [];
+  if (codes.length === 0) {
+    el.innerHTML = '<div class="code-empty">발급된 코드가 없습니다.</div>';
+    return;
+  }
+  el.innerHTML = codes.map(c => `
+    <div class="code-item">
+      <div class="code-chip">${esc(c.code)}</div>
+      <div class="code-meta">
+        ${c.memo ? `<b>${esc(c.memo)}</b><br>` : ''}
+        생성: ${esc(c.created || '-')}
+      </div>
+      <button class="btn-del-code" onclick="deleteCode('${esc(c.code)}')">삭제</button>
+    </div>`).join('');
+}
+
+function renderSeats() {
+  const el = document.getElementById('seatList');
+  const seats = lastSeats.seats || [];
+  if (seats.length === 0) {
+    el.innerHTML = '<div class="code-empty">등록된 이용자가 없습니다.</div>';
+    return;
+  }
+  el.innerHTML = seats.map((s, i) => `
+    <div class="seat-row">
+      <div class="seat-num">${i+1}</div>
+      <div class="seat-info">
+        <div class="seat-name">${esc(s.name)}</div>
+        <div class="seat-detail">${esc(s.unit)}</div>
+      </div>
+      <div class="seat-time">${s.time||''}</div>
+      <button class="btn-force-del" onclick="forceDelete(${i})">강제 퇴실</button>
+    </div>`).join('');
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── API 호출 ────────────────────────────────────
+async function call(action, body) {
+  const res = await fetch(`${API}?action=${action}`, {
+    method : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify({ ...body, adminPassword: adminPw }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || '서버 오류');
+  return json;
+}
+
+// ── 로딩/토스트 ────────────────────────────────
+function loading(on, msg='') {
+  document.getElementById('loading').style.display = on ? 'flex' : 'none';
+  if (msg) document.getElementById('ltext').textContent = msg;
+}
+let tt;
+function toast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'toast ' + type;
+  requestAnimationFrame(() => el.classList.add('show'));
+  clearTimeout(tt); tt = setTimeout(() => el.classList.remove('show'), 3400);
+}
+</script>
+</body>
+</html>
