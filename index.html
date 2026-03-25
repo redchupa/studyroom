@@ -126,9 +126,10 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg)
     <p id="modalDeleteName" style="font-weight:700;font-size:.92rem;color:var(--blue-dark);margin-bottom:6px"></p>
     <p>등록 시 발급된 <b>퇴실코드 4자리</b>를 입력하세요.</p>
     <input class="modal-input" type="tel" id="iExitCode" placeholder="0000" maxlength="4" autocomplete="off">
+    <div id="exitFailMsg" style="font-size:.78rem;font-weight:700;min-height:18px;margin-bottom:8px;text-align:center"></div>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeDeleteModal()">취소</button>
-      <button class="btn-confirm" onclick="confirmDelete()">퇴실 확인</button>
+      <button class="btn-confirm" id="btnConfirmDel" onclick="confirmDelete()">퇴실 확인</button>
     </div>
   </div>
 </div>
@@ -186,11 +187,13 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg)
              autocomplete="off" style="letter-spacing:4px;font-weight:700;font-size:1.1rem;text-transform:uppercase">
     </div>
     <button class="btn-reg" id="btnReg" onclick="register()">등록하기</button>
+    <div id="regFailMsg" style="font-size:.78rem;font-weight:700;min-height:18px;margin-top:8px;text-align:center"></div>
   </div>
 </div>
 
 <div class="footer">
   ※ 무인 운영 시설입니다. 이용 수칙을 반드시 준수해 주세요.<br>
+  <a href="/rules.html" style="display:inline-block;margin-top:10px;background:linear-gradient(135deg,#1a2e5a,#2c5282);color:#fff;text-decoration:none;border-radius:20px;padding:8px 22px;font-size:.78rem;font-weight:700;box-shadow:0 2px 8px rgba(44,82,130,.3)">📋 독서실 이용수칙 보기</a><br><br>
   문의: 제일풍경채더숲 관리사무소
 </div>
 
@@ -257,27 +260,105 @@ function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// ── 입장코드 브루트포스 방어 (클라이언트) ──────────
+const REG_MAX_FAIL  = 5;
+const REG_LOCK_MS   = 60 * 1000; // 1분
+let regFailCount    = 0;
+let regLockedUntil  = null;
+
+function isRegLocked() {
+  if (regLockedUntil && Date.now() < regLockedUntil) return true;
+  if (regLockedUntil && Date.now() >= regLockedUntil) {
+    regLockedUntil = null;
+    regFailCount   = 0;
+    updateRegBtn();
+  }
+  return false;
+}
+
+function updateRegBtn() {
+  const btn = document.getElementById('btnReg');
+  const msg = document.getElementById('regFailMsg');
+  if (isRegLocked()) {
+    const remain = Math.ceil((regLockedUntil - Date.now()) / 1000);
+    btn.disabled    = true;
+    btn.textContent = `🔒 잠금 (${remain}초)`;
+    if (msg) msg.style.color = 'var(--red)';
+  } else {
+    btn.disabled    = false;
+    btn.textContent = '등록하기';
+    if (msg) msg.textContent = '';
+  }
+}
+
+let regLockTimer = null;
+function startRegLockTimer() {
+  clearInterval(regLockTimer);
+  regLockTimer = setInterval(() => {
+    if (!regLockedUntil || Date.now() >= regLockedUntil) {
+      clearInterval(regLockTimer);
+      updateRegBtn();
+    } else {
+      updateRegBtn();
+    }
+  }, 1000);
+}
+
+function showRegMsg(msg, type) {
+  const el = document.getElementById('regFailMsg');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = type === 'error' ? 'var(--red)' : 'var(--green)';
+}
+
 // ── 등록 ───────────────────────────────────────
 async function register() {
+  // 잠금 확인
+  if (isRegLocked()) {
+    const remain = Math.ceil((regLockedUntil - Date.now()) / 1000);
+    showRegMsg(`🔒 ${remain}초 후에 다시 시도해 주세요.`, 'error');
+    return;
+  }
+
   const name = document.getElementById('iName').value.trim();
   const code = document.getElementById('iCode').value.trim().toUpperCase();
-  if (!name) { toast('이름을 입력해 주세요.', 'error'); return; }
-  if (!code) { toast('관리사무소에서 받은 코드를 입력해 주세요.', 'error'); return; }
-  if (code.length !== 4) { toast('코드는 4자리입니다.', 'error'); return; }
+  if (!name) { showRegMsg('이름을 입력해 주세요.', 'error'); return; }
+  if (!code) { showRegMsg('관리사무소에서 받은 코드를 입력해 주세요.', 'error'); return; }
+  if (code.length !== 4) { showRegMsg('코드는 4자리입니다.', 'error'); return; }
 
   loading(true, '등록 중...');
   try {
     const res = await call('register', { name, code });
+    // 성공 시 실패 카운트 초기화
+    regFailCount   = 0;
+    regLockedUntil = null;
+    clearInterval(regLockTimer);
     document.getElementById('iName').value = '';
     document.getElementById('iCode').value = '';
+    showRegMsg('', '');
     render(res.seats);
     loading(false);
-    // 퇴실코드 모달 표시
     document.getElementById('exitCodeDisplay').textContent = res.exitCode;
     document.getElementById('modalRegDone').classList.remove('hidden');
   } catch(e) {
     loading(false);
-    toast(e.message, 'error');
+    // 코드 오류일 때만 카운트
+    if (e.message.includes('유효하지 않은 코드')) {
+      regFailCount += 1;
+      const left = REG_MAX_FAIL - regFailCount;
+      if (left <= 0) {
+        regLockedUntil = Date.now() + REG_LOCK_MS;
+        regFailCount   = 0;
+        updateRegBtn();
+        startRegLockTimer();
+        showRegMsg('🔒 5회 오류. 1분간 잠금됩니다.', 'error');
+      } else {
+        showRegMsg(`유효하지 않은 코드입니다. (${left}회 남음)`, 'error');
+      }
+      document.getElementById('iCode').value = '';
+    } else {
+      showRegMsg(e.message, 'error');
+    }
   }
 }
 
@@ -292,6 +373,8 @@ function openDeleteModal(i) {
   deleteTarget = { name: s.name, time: s.time };
   document.getElementById('modalDeleteName').textContent = `이름: ${s.name}`;
   document.getElementById('iExitCode').value = '';
+  document.getElementById('exitFailMsg').textContent = '';
+  updateExitBtn();
   document.getElementById('modalDelete').classList.remove('hidden');
   setTimeout(() => document.getElementById('iExitCode').focus(), 100);
 }
@@ -301,27 +384,111 @@ function closeDeleteModal() {
   deleteTarget = null;
 }
 
+// ── 퇴실코드 브루트포스 방어 (클라이언트) ─────────
+const EXIT_MAX_FAIL  = 5;
+const EXIT_LOCK_MS   = 60 * 1000; // 1분
+let exitFailCount    = 0;
+let exitLockedUntil  = null;
+
+function isExitLocked() {
+  if (exitLockedUntil && Date.now() < exitLockedUntil) return true;
+  if (exitLockedUntil && Date.now() >= exitLockedUntil) {
+    // 잠금 만료 → 초기화
+    exitLockedUntil = null;
+    exitFailCount   = 0;
+    updateExitBtn();
+  }
+  return false;
+}
+
+function updateExitBtn() {
+  const btn = document.getElementById('btnConfirmDel');
+  if (!btn) return;
+  if (isExitLocked()) {
+    const remain = Math.ceil((exitLockedUntil - Date.now()) / 1000);
+    btn.disabled    = true;
+    btn.textContent = `잠금 (${remain}초)`;
+  } else {
+    btn.disabled    = false;
+    btn.textContent = '퇴실 확인';
+  }
+}
+
+// 잠금 중 카운트다운 타이머
+let lockTimer = null;
+function startLockTimer() {
+  clearInterval(lockTimer);
+  lockTimer = setInterval(() => {
+    if (!exitLockedUntil || Date.now() >= exitLockedUntil) {
+      clearInterval(lockTimer);
+      updateExitBtn();
+      document.getElementById('exitFailMsg').textContent = '';
+    } else {
+      updateExitBtn();
+    }
+  }, 1000);
+}
+
 async function confirmDelete() {
-  if (!deleteTarget) return;
+  // deleteTarget을 지역변수에 먼저 복사 (closeModal 전에)
+  const target = deleteTarget;
+  if (!target) return;
+
+  // 잠금 확인
+  if (isExitLocked()) {
+    const remain = Math.ceil((exitLockedUntil - Date.now()) / 1000);
+    showExitMsg(`🔒 ${remain}초 후에 다시 시도해 주세요.`, 'error');
+    return;
+  }
+
   const exitCode = document.getElementById('iExitCode').value.trim();
   if (!exitCode || exitCode.length !== 4) {
-    toast('퇴실코드 4자리를 입력해 주세요.', 'error'); return;
+    showExitMsg('퇴실코드 4자리를 입력해 주세요.', 'error'); return;
   }
-  closeDeleteModal();
+
+  // 모달을 닫지 않고 로딩만 표시
   loading(true, '퇴실 처리 중...');
   try {
     const res = await call('deleteEntry', {
-      name    : deleteTarget.name,
-      time    : deleteTarget.time,
+      name    : target.name,
+      time    : target.time,
       exitCode: exitCode,
     });
+    // 성공 시 모달 닫고 초기화
+    exitFailCount  = 0;
+    exitLockedUntil = null;
+    clearInterval(lockTimer);
+    closeDeleteModal();
     render(res.seats);
     loading(false);
     toast('👋 퇴실 완료. 이용해 주셔서 감사합니다!', 'success');
   } catch(e) {
     loading(false);
-    toast(e.message, 'error');
+    if (e.message.includes('퇴실코드가 일치하지 않습니다')) {
+      exitFailCount += 1;
+      const left = EXIT_MAX_FAIL - exitFailCount;
+      if (left <= 0) {
+        exitLockedUntil = Date.now() + EXIT_LOCK_MS;
+        exitFailCount   = 0;
+        updateExitBtn();
+        startLockTimer();
+        showExitMsg('🔒 5회 오류. 1분간 잠금됩니다.', 'error');
+      } else {
+        showExitMsg(`비밀번호가 틀렸습니다. (${left}회 남음)`, 'error');
+      }
+      document.getElementById('iExitCode').value = '';
+      document.getElementById('iExitCode').focus();
+    } else {
+      toast(e.message, 'error');
+    }
   }
+}
+
+function showExitMsg(msg, type) {
+  const el = document.getElementById('exitFailMsg');
+  if (!el) return;
+  el.textContent  = msg;
+  el.style.color  = type === 'error' ? 'var(--red)' : 'var(--green)';
 }
 
 document.getElementById('iExitCode').addEventListener('keydown', e => {
