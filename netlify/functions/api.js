@@ -67,10 +67,16 @@ function timeKST() {
   return `${String(now.getUTCHours()).padStart(2,'0')}:${String(now.getUTCMinutes()).padStart(2,'0')}`;
 }
 
-// ── 랜덤 코드 생성 (4자리 영대문자+숫자) ──────────────────
+// ── 코드 생성 ────────────────────────────────────────────
 function genCode() {
+  // 입장 코드: 영대문자+숫자 4자리 (혼동 문자 제외)
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   return Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+function genExitCode() {
+  // 퇴실 코드: 숫자 4자리 (모바일 숫자패드 입력 편의)
+  return String(Math.floor(1000 + Math.random() * 9000));
 }
 
 // ── 자정 초기화 ──────────────────────────────────────────
@@ -91,7 +97,6 @@ async function getAttempts() {
   try {
     return await ghGet('attempts.json');
   } catch (_) {
-    // 파일이 없으면 빈 객체로 시작
     return { data: {}, sha: null };
   }
 }
@@ -101,28 +106,23 @@ async function checkLock(ip) {
   const now   = Date.now();
   const entry = data[ip];
 
-  // 잠금 상태 확인
   if (entry?.lockedUntil && now < entry.lockedUntil) {
     const remaining = Math.ceil((entry.lockedUntil - now) / 60000);
     return { locked: true, remaining, data, sha };
   }
-
-  // 잠금 만료 시 해당 IP 기록 삭제
   if (entry?.lockedUntil && now >= entry.lockedUntil) {
     delete data[ip];
     try { await ghPut('attempts.json', data, sha, `unlock ${ip}`); } catch(_) {}
   }
-
   return { locked: false, data, sha };
 }
 
 async function recordFail(ip, data, sha) {
   if (!data[ip]) data[ip] = { count: 0, lockedUntil: null };
   data[ip].count += 1;
-
   if (data[ip].count >= MAX_ATTEMPTS) {
     data[ip].lockedUntil = Date.now() + LOCK_MS;
-    data[ip].count       = 0; // 잠금 후 카운트 리셋
+    data[ip].count       = 0;
   }
   try { await ghPut('attempts.json', data, sha, `fail ${ip}`); } catch(_) {}
 }
@@ -160,73 +160,92 @@ exports.handler = async (event) => {
       if (fresh.date !== data.date) {
         await ghPut('seats.json', fresh, sha, `auto-reset ${fresh.date}`);
       }
-      return ok(fresh);
+      // exitCode는 클라이언트에 노출하지 않음
+      const safeSeats = {
+        ...fresh,
+        seats: fresh.seats.map(({ name, time }) => ({ name, time })),
+      };
+      return ok(safeSeats);
     }
 
     // ── 2. 명부 등록 ─────────────────────────────────────
     if (action === 'register') {
-      const { name, unit, code } = body;
-      if (!name || !unit || !code) return err('이름, 동호수, 코드를 모두 입력하세요.');
+      const { name, code } = body;
+      if (!name || !code) return err('이름과 코드를 모두 입력하세요.');
 
+      // 입장 코드 검증
       const { data: codeData, sha: codeSha } = await ghGet('codes.json');
       const codeEntry = codeData.codes.find(c => c.code === code.toUpperCase());
       if (!codeEntry) return err('유효하지 않은 코드입니다. 관리사무소에서 발급받은 코드를 입력하세요.');
 
+      // 좌석 등록
       const { data: seatData, sha: seatSha } = await ghGet('seats.json');
       const fresh = resetIfNewDay(seatData);
       if (fresh.seats.length >= 5) return err('오늘 정원(5명)이 마감되었습니다.');
 
-      fresh.seats.push({ name, unit, time: timeKST() });
+      // 퇴실코드 생성 (숫자 4자리)
+      const exitCode = genExitCode();
+
+      fresh.seats.push({ name, time: timeKST(), exitCode });
       await ghPut('seats.json', fresh, seatSha, `register ${name} ${fresh.date}`);
 
+      // 사용된 입장 코드 삭제 (1회용)
       codeData.codes = codeData.codes.filter(c => c.code !== code.toUpperCase());
       await ghPut('codes.json', codeData, codeSha, `use code ${code}`);
 
-      return ok({ success: true, seats: fresh });
+      // 응답: 퇴실코드는 이 한 번만 클라이언트에 전달
+      const safeSeats = {
+        ...fresh,
+        seats: fresh.seats.map(({ name, time }) => ({ name, time })),
+      };
+      return ok({ success: true, exitCode, seats: safeSeats });
     }
 
-    // ── 3. 명부 삭제 (퇴실) ──────────────────────────────
+    // ── 3. 명부 삭제 (퇴실) — 퇴실코드 검증 ─────────────
     if (action === 'deleteEntry') {
-      const { name, unit, time } = body;
-      if (!name || !unit) return err('삭제할 항목 정보가 없습니다.');
+      const { name, time, exitCode } = body;
+      if (!name || !time || !exitCode) return err('삭제 정보가 부족합니다.');
 
       const { data, sha } = await ghGet('seats.json');
-      const before = data.seats.length;
-      data.seats = data.seats.filter(s => !(s.name === name && s.unit === unit && s.time === time));
-      if (data.seats.length === before) return err('해당 항목을 찾을 수 없습니다.');
+      const target = data.seats.find(s => s.name === name && s.time === time);
 
+      if (!target) return err('해당 항목을 찾을 수 없습니다.');
+      if (target.exitCode !== exitCode) return err('퇴실코드가 일치하지 않습니다.');
+
+      data.seats = data.seats.filter(s => !(s.name === name && s.time === time));
       await ghPut('seats.json', data, sha, `exit ${name} ${data.date}`);
-      return ok({ success: true, seats: data });
+
+      const safeSeats = {
+        ...data,
+        seats: data.seats.map(({ name, time }) => ({ name, time })),
+      };
+      return ok({ success: true, seats: safeSeats });
     }
 
-    // ── 4. 관리자 로그인 (브루트포스 방어 적용) ──────────
+    // ── 4. 관리자 로그인 (브루트포스 방어) ───────────────
     if (action === 'adminLogin') {
       const { password } = body;
       if (!ADMIN_PASS) return err('서버에 ADMIN_PASSWORD가 설정되지 않았습니다.', 500);
 
-      // 클라이언트 IP 추출
       const ip = event.headers?.['x-forwarded-for']?.split(',')[0]?.trim()
               || event.headers?.['client-ip']
               || 'unknown';
 
-      // 잠금 여부 확인
       const { locked, remaining, data: attData, sha: attSha } = await checkLock(ip);
       if (locked) {
         return err(`로그인 시도가 너무 많습니다. ${remaining}분 후에 다시 시도해 주세요.`, 429);
       }
 
-      // 비밀번호 검증
       if (password !== ADMIN_PASS) {
         await recordFail(ip, attData, attSha);
         const count = attData[ip]?.count || 0;
         const left  = MAX_ATTEMPTS - count;
         if (left <= 0) {
-          return err(`비밀번호 5회 오류. ${LOCK_MS / 60000}분간 잠금됩니다.`, 401);
+          return err(`비밀번호 ${MAX_ATTEMPTS}회 오류. ${LOCK_MS/60000}분간 잠금됩니다.`, 401);
         }
         return err(`비밀번호가 틀렸습니다. (${left}회 남음)`, 401);
       }
 
-      // 로그인 성공 → 실패 기록 초기화
       await clearFail(ip, attData, attSha);
       return ok({ success: true });
     }
@@ -268,12 +287,26 @@ exports.handler = async (event) => {
       return ok({ success: true, codes: data });
     }
 
-    // ── 8. 좌석 강제 초기화 ──────────────────────────────
+    // ── 8. 좌석 강제 초기화 (관리자) ─────────────────────
     if (action === 'resetSeats') {
       const { data, sha } = await ghGet('seats.json');
       const reset = { date: todayKST(), seats: [] };
       await ghPut('seats.json', reset, sha, `admin reset ${reset.date}`);
       return ok({ success: true });
+    }
+
+    // ── 9. 관리자 강제 퇴실 (퇴실코드 없이) ──────────────
+    if (action === 'adminDeleteEntry') {
+      const { name, time } = body;
+      if (!name || !time) return err('삭제 정보가 부족합니다.');
+
+      const { data, sha } = await ghGet('seats.json');
+      const before = data.seats.length;
+      data.seats = data.seats.filter(s => !(s.name === name && s.time === time));
+      if (data.seats.length === before) return err('해당 항목을 찾을 수 없습니다.');
+
+      await ghPut('seats.json', data, sha, `admin exit ${name} ${data.date}`);
+      return ok({ success: true, seats: data });
     }
 
     return err('알 수 없는 action입니다.');
